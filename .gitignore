@@ -1,0 +1,26 @@
+# Built binaries and outputs
+*.apk
+*.idsig
+*.zip
+*.dex
+*.class
+bin/
+build/
+app/build/
+.gradle/
+*.log
+
+# Keystores and private signing credentials
+*.keystore
+*.jks
+*.p12
+*.key
+signing.properties
+
+# IDE and OS files
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+local.properties
