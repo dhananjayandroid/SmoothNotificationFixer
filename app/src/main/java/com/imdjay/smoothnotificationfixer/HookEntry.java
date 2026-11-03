@@ -112,5 +112,72 @@ public class HookEntry implements IXposedHookLoadPackage {
         } catch (Throwable t) {
             XposedBridge.log(TAG + "Error hooking Settings$NameValueCache: " + t.getMessage());
         }
+
+        // 4. Hook NotificationShelf and NotificationShelfBackgroundView
+        // Eliminates the floating/moving shelf background blur highlight during shade swipe-up
+        try {
+            Class<?> shelfClass = XposedHelpers.findClassIfExists(
+                "com.android.systemui.statusbar.NotificationShelf",
+                lpparam.classLoader
+            );
+            if (shelfClass != null) {
+                // Force shelf to always report transparent background
+                XposedBridge.hookAllMethods(shelfClass, "usesTransparentBackground", new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        param.setResult(true);
+                    }
+                });
+
+                // Ensure mBackgroundNormal is hidden and transparent after inflation
+                XposedBridge.hookAllMethods(shelfClass, "onFinishInflate", new XC_MethodHook() {
+                    @Override
+                    protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                        try {
+                            Object bgNormal = XposedHelpers.getObjectField(param.thisObject, "mBackgroundNormal");
+                            if (bgNormal instanceof android.view.View) {
+                                android.view.View v = (android.view.View) bgNormal;
+                                v.setVisibility(android.view.View.GONE);
+                                v.setAlpha(0.0f);
+                                v.setBackground(null);
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                });
+                XposedBridge.log(TAG + "Hooked NotificationShelf -> TRANSPARENT BACKGROUND ACTIVE");
+            }
+
+            Class<?> shelfBgClass = XposedHelpers.findClassIfExists(
+                "com.android.systemui.statusbar.notification.shelf.NotificationShelfBackgroundView",
+                lpparam.classLoader
+            );
+            if (shelfBgClass != null) {
+                // Intercept both draw and onDraw to ensure zero pixels/blur are rendered
+                XC_MethodHook silenceDraw = new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        param.setResult(null);
+                    }
+                };
+                XposedBridge.hookAllMethods(shelfBgClass, "draw", silenceDraw);
+                XposedBridge.hookAllMethods(shelfBgClass, "onDraw", silenceDraw);
+
+                // Also silence setBlurBackgroundEnabled if called
+                try {
+                    XposedBridge.hookAllMethods(shelfBgClass, "setBlurBackgroundEnabled", new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                            if (param.args != null && param.args.length > 0) {
+                                param.args[0] = false;
+                            }
+                        }
+                    });
+                } catch (Throwable ignored) {}
+
+                XposedBridge.log(TAG + "Hooked NotificationShelfBackgroundView.draw & onDraw -> SILENCED (ZERO BLUR HIGHLIGHT)");
+            }
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + "Error hooking NotificationShelf: " + t.getMessage());
+        }
     }
 }

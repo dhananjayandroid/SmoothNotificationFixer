@@ -32,7 +32,8 @@ Because these custom keys are not indexed into AOSP's internal `SettingsProvider
 **Smooth Notification Fixer** hooks into `com.android.systemui` at runtime via LSPosed / Vector:
 1. **Ultra-Fast In-Memory Cache**: Intercepts `Settings$NameValueCache.getStringForUser` inside SystemUI with a thread-safe in-memory cache (`ConcurrentHashMap`). Subsequent queries return in **<0.001 ms without Binder IPC**.
 2. **Expansion IPC Silencing**: Silences redundant `maybeLogNotificationExpansionChange` and eliminates `onNotificationExpansionChanged` Binder calls during active scrolling.
-3. **Zero System Modifications**: Runs 100% in memory via ART runtime hooking — leaves system partitions untouched, fully reversible at any time.
+3. **Notification Shelf Swipe-Up Blur Artifact Elimination (v1.2)**: Silences `NotificationShelfBackgroundView` rendering and forces transparent shelf mode (`usesTransparentBackground`), eliminating the ghost blur pill / highlight that sweeps across the screen when collapsing the notification shade.
+4. **Zero System Modifications**: Runs 100% in memory via ART runtime hooking — leaves system partitions untouched, fully reversible at any time.
 
 ---
 

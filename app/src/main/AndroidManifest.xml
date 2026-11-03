@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.imdjay.smoothnotificationfixer"
-    android:versionCode="101"
-    android:versionName="1.1">
+    android:versionCode="102"
+    android:versionName="1.2">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35" />
 
@@ -15,7 +15,7 @@
             android:value="true" />
         <meta-data
             android:name="xposeddescription"
-            android:value="Eliminates synchronous Binder IPC lag and uncached settings stalls in SystemUI notification scrolling (Author: imdjay)" />
+            android:value="Eliminates synchronous Binder IPC lag, uncached settings stalls, and notification shelf swipe-up blur artifacts (Author: imdjay)" />
         <meta-data
             android:name="xposedminversion"
             android:value="93" />
