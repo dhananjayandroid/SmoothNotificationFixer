@@ -5,21 +5,17 @@ import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Smooth Notification Fixer for SystemUI
  * Author: imdjay
  *
- * Eliminates synchronous blocking Binder IPC calls and uncached settings loops
- * occurring inside SystemUI during notification shade scrolling.
+ * Eliminates synchronous blocking Binder IPC calls and notification shelf
+ * swipe-up blur artifacts occurring inside SystemUI during notification shade scrolling.
+ * Preserves 100% native ROM settings reactivity (Smart Pixels, Status Bar toggles, etc.).
  */
 public class HookEntry implements IXposedHookLoadPackage {
     private static final String TAG = "[SmoothNotificationFixer by imdjay] ";
-    private static final ConcurrentHashMap<String, String> sSettingCache = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<String, AtomicInteger> sSettingCounts = new ConcurrentHashMap<>();
-    private static final String NULL_SENTINEL = "__NULL_SETTING__";
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
@@ -69,51 +65,7 @@ public class HookEntry implements IXposedHookLoadPackage {
             XposedBridge.log(TAG + "Error hooking IStatusBarService: " + t.getMessage());
         }
 
-        // 3. Hook Settings$NameValueCache.getStringForUser
-        // Custom ROMs introduce un-indexed custom toggles (like colored statusbar icons) that invalidate
-        // AOSP generation tracking, triggering thousands of synchronous round-trip IPCs to system_server.
-        // Intercepting with a concurrent in-memory cache delivers results in <0.001ms.
-        try {
-            Class<?> cacheClass = XposedHelpers.findClassIfExists(
-                "android.provider.Settings$NameValueCache",
-                lpparam.classLoader
-            );
-            if (cacheClass != null) {
-                XposedBridge.hookAllMethods(cacheClass, "getStringForUser", new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        if (param.args != null && param.args.length > 1 && param.args[1] instanceof String) {
-                            String name = (String) param.args[1];
-                            AtomicInteger count = sSettingCounts.computeIfAbsent(name, k -> new AtomicInteger(0));
-                            int c = count.incrementAndGet();
-                            if (c == 1 || c % 1000 == 0) {
-                                XposedBridge.log(TAG + "Setting intercepted: " + name + " (hits=" + c + ")");
-                            }
-                            String cached = sSettingCache.get(name);
-                            if (cached != null) {
-                                param.setResult(NULL_SENTINEL.equals(cached) ? null : cached);
-                            }
-                        }
-                    }
-
-                    @Override
-                    protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                        if (param.args != null && param.args.length > 1 && param.args[1] instanceof String) {
-                            String name = (String) param.args[1];
-                            if (!sSettingCache.containsKey(name)) {
-                                Object res = param.getResult();
-                                sSettingCache.put(name, res == null ? NULL_SENTINEL : (String) res);
-                            }
-                        }
-                    }
-                });
-                XposedBridge.log(TAG + "Hooked Settings$NameValueCache.getStringForUser -> ULTRA-FAST IN-MEMORY CACHE ACTIVE");
-            }
-        } catch (Throwable t) {
-            XposedBridge.log(TAG + "Error hooking Settings$NameValueCache: " + t.getMessage());
-        }
-
-        // 4. Hook NotificationShelf and NotificationShelfBackgroundView
+        // 3. Hook NotificationShelf and NotificationShelfBackgroundView
         // Eliminates the floating/moving shelf background blur highlight during shade swipe-up
         try {
             Class<?> shelfClass = XposedHelpers.findClassIfExists(

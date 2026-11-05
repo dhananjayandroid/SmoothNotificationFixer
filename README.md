@@ -15,24 +15,20 @@
 
 On many custom ROMs (most notably **Evolution X**, LineageOS forks, and various AOSP-based custom ROMs), scrolling through the notification shade causes severe stutter and frame drops as notifications accumulate. When 30 to 100+ notifications are pending, frame times can spike beyond **50ms (~20 FPS)** on a 120Hz display.
 
-### The Root Cause: Uncached Synchronous Binder IPC Loops
-
-Deep systrace/atrace profiling revealed that custom ROMs frequently introduce custom status bar customization toggles (e.g., `statusbar_colored_icons`, `statusbar_notif_count`).
-
-Because these custom keys are not indexed into AOSP's internal `SettingsProvider` generation tracker:
-1. Android's built-in `Settings$NameValueCache` misses every lookup.
-2. Every notification row repeatedly calls `Settings.System.getStringForUser(...)` on every frame during scrolling.
-3. SystemUI triggers **over 7,500 synchronous blocking Binder IPC calls to `system_server` in under two seconds** directly on the main UI thread.
-4. Paired with synchronous `IStatusBarService.onNotificationExpansionChanged` IPC stalls, the UI thread spends almost all of its frame budget waiting for Binder responses.
+### The Root Cause: Synchronous Expansion Binder IPC & Shelf Blur
+Deep systrace/atrace profiling revealed that SystemUI triggers:
+1. `NotificationStatsLoggerImpl.maybeLogNotificationExpansionChange` per-frame expansion state logging during scroll.
+2. Synchronous `IStatusBarService.onNotificationExpansionChanged` IPC stalls blocking the main UI thread.
+3. `NotificationShelfBackgroundView` recalculating and drawing a moving blur highlight artifact when collapsing the shade.
 
 ---
 
-## 🚀 The Solution
+## 🚀 The Solution (v1.3)
 
 **Smooth Notification Fixer** hooks into `com.android.systemui` at runtime via LSPosed / Vector:
-1. **Ultra-Fast In-Memory Cache**: Intercepts `Settings$NameValueCache.getStringForUser` inside SystemUI with a thread-safe in-memory cache (`ConcurrentHashMap`). Subsequent queries return in **<0.001 ms without Binder IPC**.
-2. **Expansion IPC Silencing**: Silences redundant `maybeLogNotificationExpansionChange` and eliminates `onNotificationExpansionChanged` Binder calls during active scrolling.
-3. **Notification Shelf Swipe-Up Blur Artifact Elimination (v1.2)**: Silences `NotificationShelfBackgroundView` rendering and forces transparent shelf mode (`usesTransparentBackground`), eliminating the ghost blur pill / highlight that sweeps across the screen when collapsing the notification shade.
+1. **Expansion IPC Silencing**: Silences redundant `maybeLogNotificationExpansionChange` and eliminates `onNotificationExpansionChanged` Binder calls during active scrolling.
+2. **Notification Shelf Swipe-Up Blur Artifact Elimination**: Silences `NotificationShelfBackgroundView` rendering and forces transparent shelf mode (`usesTransparentBackground`), eliminating the ghost blur pill / highlight that sweeps across the screen when collapsing the notification shade.
+3. **100% Native Custom ROM Reactive Settings**: Zero unmanaged settings caches. Live customization toggles (Smart Pixels, Status Bar icon colors, Quick Settings styles, network meters) apply instantly in real-time without restarting SystemUI.
 4. **Zero System Modifications**: Runs 100% in memory via ART runtime hooking — leaves system partitions untouched, fully reversible at any time.
 
 ---
@@ -66,7 +62,7 @@ Tested on Snapdragon 7+ Gen 2 (`marblein`), Evolution X (Android 17 Canary), 120
 
 ## 📥 Installation
 
-1. Download [`SmoothNotificationFixer-v1.1.apk`](https://github.com/dhananjayandroid/SmoothNotificationFixer/releases) from the **Releases** tab.
+1. Download [`SmoothNotificationFixer-v1.3.apk`](https://github.com/dhananjayandroid/SmoothNotificationFixer/releases) from the **Releases** tab.
 2. Install the APK on your rooted device.
 3. Open **LSPosed** or **Vector Manager**.
 4. Enable **Smooth Notification Fixer** in the Modules list.
