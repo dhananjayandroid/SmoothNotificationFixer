@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.imdjay.smoothnotificationfixer"
-    android:versionCode="103"
-    android:versionName="1.3">
+    android:versionCode="104"
+    android:versionName="1.4">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35" />
 
@@ -14,7 +14,7 @@
             android:value="true" />
         <meta-data
             android:name="xposeddescription"
-            android:value="Eliminates synchronous Binder IPC lag and notification shelf swipe-up blur artifacts without interfering with ROM customization toggles (Author: imdjay)" />
+            android:value="Eliminates synchronous Binder IPC lag, per-frame expansion loops, and notification shelf blur artifacts with hybrid real-time setting reactivity (Author: imdjay)" />
         <meta-data
             android:name="xposedminversion"
             android:value="93" />
